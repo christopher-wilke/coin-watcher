@@ -1,27 +1,27 @@
+use anyhow::Result;
+
 use coin_watcher::config::*;
 use iota_client::{
-    Client, Result,
+    Client,
 };
 
 #[tokio::main]
-pub async fn main() -> Result<()> {
+pub async fn main() -> Result<(), anyhow::Error> {
 
-    Config::read_file().await;
+    let cfg = Config::get_cfg().await?;
 
-    // let node_url = "https://chrysalis-nodes.iota.org";
+    let iota = Client::builder()
+        .with_node(&cfg.node_url)?
+        .finish()
+        .await?;
 
-    // let iota = Client::builder()
-    //     .with_node("https://chrysalis-nodes.iota.org")?
-    //     .finish()
-    //     .await?;
+    let balance = iota.get_address_balances(&cfg.addresses)
+        .await?
+        .get(0)
+        .unwrap()
+        .balance;
 
-    // let info = iota.get_info().await?;
-
-    // let address = ["iota1qrmmva42tzhy9262rtqnf9spphn3vucj0ajrpfzfykue5xj4v3gg2zu58jg ".to_string()];
-
-    // let balance = iota.get_address_balances(&address).await?;
-
-    // println!("{balance:?}");
+    println!("{balance:?}");
 
     Ok(())
 }

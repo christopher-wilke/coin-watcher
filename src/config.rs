@@ -9,15 +9,12 @@ pub struct Config {
     pub addresses: Vec<String>   
 }
 
-impl Config {
+pub async fn read_cfg() -> Result<Config, anyhow::Error> {
 
-    pub async fn get_cfg() -> Result<Config, anyhow::Error> {
+    let tokio_file = tokio::fs::File::open(CFG_FILE)
+        .await?
+        .into_std()
+        .await;
 
-        let tokio_file = tokio::fs::File::open(CFG_FILE)
-            .await?
-            .into_std()
-            .await;
-
-        Ok(serde_yaml::from_reader(tokio_file)?)
-    }
+    Ok(serde_yaml::from_reader(tokio_file)?)
 }

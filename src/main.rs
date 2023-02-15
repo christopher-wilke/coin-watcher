@@ -1,4 +1,4 @@
-use std::{sync::{Arc, Mutex}, time::{SystemTime, UNIX_EPOCH}, collections::HashMap};
+use std::{sync::{Arc}, time::{SystemTime, UNIX_EPOCH, Duration}, collections::HashMap};
 
 use anyhow::{Result, Ok};
 
@@ -7,6 +7,7 @@ use iota_client::{
     Client,
 };
 use log::{info, debug, error};
+use tokio::sync::Mutex;
 
 #[tokio::main]
 pub async fn main() -> Result<(), anyhow::Error> {
@@ -15,11 +16,8 @@ pub async fn main() -> Result<(), anyhow::Error> {
     std::env::set_var("RUST_LOG", "info");
     env_logger::init();
 
-    let state: StateManager = Arc::new(Mutex::new(HashMap::new()));
+    let state: StateManager = std::sync::Arc::new(tokio::sync::Mutex::new(HashMap::new()));
     let cfg = config::read_cfg().await?;
-
-    // (1) Set addresses in hashhmap and wait for it to finish
-    // (2) Run scanner continuously
     
     loop {
         let iota_client = Client::builder()
@@ -29,10 +27,14 @@ pub async fn main() -> Result<(), anyhow::Error> {
 
         let adr = cfg.addresses.clone();
         let state = state.clone();
-        tokio::spawn(async move {
-            get_balance(iota_client, &adr, state).await?;
-            Ok(())
-        });
+
+        tokio::task::Builder::new()
+            .name("get balance task")
+            .spawn(async move {
+                get_balance(iota_client, &adr, state).await?;
+                Ok(()) 
+            })?;
+
         tokio::time::sleep(std::time::Duration::from_millis(5000)).await;
     }
 }
@@ -47,15 +49,14 @@ async fn get_balance(
     let resp = iota_client.get_address_balances(addresses).await?;
 
     for balance_address_response in resp {
-       
-        {
-            let mut state = state.lock().unwrap();
+        
+            let mut state = state.lock().await;
             state.insert(balance_address_response.address.clone(), BalanceState {
                 balance: balance_address_response.balance,
                 last_updated: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs()
             });
-        }
-        tokio::time::sleep(std::time::Duration::from_millis(3000)).await;
+        
+        tokio::time::sleep(Duration::from_millis(5000)).await;
         info!("Updated State: {state:?}");
     }
     Ok(())

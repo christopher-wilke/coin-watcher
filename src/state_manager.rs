@@ -1,4 +1,6 @@
-use std::{sync::{Arc, Mutex}, collections::HashMap};
+use std::{sync::{Arc}, collections::HashMap};
+
+use tokio::sync::Mutex;
 
 #[derive(Debug)]
 pub struct BalanceState {
